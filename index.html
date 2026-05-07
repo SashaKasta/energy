@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Трекер електроенергії</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --border: #e0ddd6;
+    --border2: #ccc9c0;
+    --text: #1a1916;
+    --muted: #6b6860;
+    --accent-light: #f0ede6;
+    --green-bg: #e8f4e8;
+    --green-text: #2d6b2d;
+    --amber-bg: #fef3e0;
+    --amber-text: #7a5000;
+    --red-bg: #fce8e8;
+    --red-text: #8b2020;
+    --font: 'IBM Plex Sans', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+    --radius: 6px;
+    --radius-lg: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  header {
+    background: var(--text); color: #fff;
+    padding: 0 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 56px;
+  }
+  header h1 { font-family: var(--mono); font-size: 14px; font-weight: 500; letter-spacing: 0.05em; }
+  .header-right { font-family: var(--mono); font-size: 12px; color: rgba(255,255,255,0.5); }
+
+  .container { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1.5rem; }
+  .metric {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 1.1rem 1.25rem;
+  }
+  .metric-label { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .metric-value { font-family: var(--mono); font-size: 26px; font-weight: 500; color: var(--text); line-height: 1; }
+  .metric-sub { font-size: 11px; color: var(--muted); margin-top: 4px; font-family: var(--mono); }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 1.25rem 1.5rem; margin-bottom: 1rem;
+  }
+  .card-title { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 1rem; }
+
+  .input-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  input[type="date"], input[type="number"], select {
+    font-family: var(--font); font-size: 14px;
+    padding: 9px 12px; border: 1px solid var(--border2);
+    border-radius: var(--radius); background: var(--bg); color: var(--text);
+    outline: none; transition: border-color 0.15s;
+  }
+  input:focus, select:focus { border-color: var(--text); }
+  input[type="date"] { width: 160px; }
+  input[type="number"] { width: 160px; }
+
+  button {
+    font-family: var(--font); font-size: 13px; font-weight: 500;
+    padding: 9px 18px; border: 1px solid var(--border2);
+    border-radius: var(--radius); background: var(--text); color: #fff;
+    cursor: pointer; transition: opacity 0.15s; white-space: nowrap;
+  }
+  button:hover { opacity: 0.85; }
+  button.secondary { background: transparent; color: var(--text); }
+  button.secondary:hover { background: var(--accent-light); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .err { font-size: 12px; color: var(--red-text); margin-top: 6px; display: none; font-family: var(--mono); }
+  .ok  { font-size: 12px; color: var(--green-text); margin-top: 6px; display: none; font-family: var(--mono); }
+
+  .tab-bar { display: flex; gap: 4px; margin-bottom: 1rem; }
+  .tab {
+    font-size: 13px; font-weight: 500; padding: 7px 16px;
+    border: 1px solid var(--border2); border-radius: var(--radius);
+    cursor: pointer; background: transparent; color: var(--muted);
+  }
+  .tab.active { background: var(--text); color: #fff; border-color: var(--text); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; }
+  .toolbar select { font-size: 13px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg); }
+  .mono { font-family: var(--mono); }
+
+  .badge { display: inline-block; font-size: 11px; font-family: var(--mono); padding: 2px 8px; border-radius: 4px; }
+  .badge-green { background: var(--green-bg); color: var(--green-text); }
+  .badge-amber { background: var(--amber-bg); color: var(--amber-text); }
+  .badge-red   { background: var(--red-bg);   color: var(--red-text);   }
+
+  .del-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 13px; padding: 3px 7px;
+    border-radius: 4px; transition: all 0.15s; font-family: var(--mono);
+  }
+  .del-btn:hover { color: var(--red-text); background: var(--red-bg); }
+
+  .summary-row {
+    display: flex; justify-content: flex-end; gap: 24px;
+    padding: 10px 10px 6px; font-size: 13px; border-top: 1px solid var(--border);
+    margin-top: 4px;
+  }
+  .summary-row span { font-family: var(--mono); color: var(--muted); }
+  .summary-row strong { font-family: var(--mono); color: var(--text); margin-left: 6px; }
+  .summary-row .green { color: #2d6b2d; }
+
+  .empty { text-align: center; padding: 2.5rem; color: var(--muted); font-size: 13px; }
+  .loading { text-align: center; padding: 2rem; color: var(--muted); font-size: 13px; font-family: var(--mono); }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border2); border-top-color: var(--text); border-radius: 50%; animation: spin 0.7s linear infinite; margin-right: 8px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .hint { font-size: 12px; color: var(--muted); margin-top: 8px; font-family: var(--mono); }
+
+  .report-box {
+    background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1.25rem 1.5rem; font-family: var(--mono); font-size: 12.5px;
+    line-height: 1.9; white-space: pre-wrap; color: var(--text);
+    max-height: 440px; overflow-y: auto;
+  }
+
+  .tariff-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .tariff-row label { font-size: 13px; color: var(--muted); }
+  .tariff-row input { width: 110px; }
+
+  @media (max-width: 600px) {
+    .metrics { grid-template-columns: 1fr 1fr; }
+    .container { padding: 1rem; }
+    header { padding: 0 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ ENERGY TRACKER</h1>
+  <span class="header-right" id="header-date"></span>
+</header>
+
+<div class="container">
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">Вчорашній показник</div>
+      <div class="metric-value mono" id="m-yesterday">—</div>
+      <div class="metric-sub">кВт·год (лічильник)</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Витрата за місяць</div>
+      <div class="metric-value mono" id="m-month">—</div>
+      <div class="metric-sub" id="m-month-uah">кВт·год</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Середнє / день</div>
+      <div class="metric-value mono" id="m-avg">—</div>
+      <div class="metric-sub">кВт·год</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Сума за місяць</div>
+      <div class="metric-value mono" id="m-uah">—</div>
+      <div class="metric-sub">гривень ₴</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Внести показник лічильника</div>
+    <div class="input-row">
+      <input type="date" id="inp-date" />
+      <input type="number" id="inp-kwh" placeholder="Показник лічильника" step="0.01" min="0" />
+      <button id="add-btn" onclick="addEntry()">Додати</button>
+    </div>
+    <div class="hint">Вносьте показання лічильника щодня — система сама рахує витрату</div>
+    <div class="err" id="err-msg"></div>
+    <div class="ok"  id="ok-msg"></div>
+  </div>
+
+  <div class="card" style="padding: 1rem 1.5rem;">
+    <div class="card-title">Тариф</div>
+    <div class="tariff-row">
+      <label>₴ за кВт·год:</label>
+      <input type="number" id="tariff-input" value="4.32" step="0.01" min="0" onchange="saveTariff()" />
+      <span style="font-size:12px;color:var(--muted);font-family:var(--mono);">Застосовується до всіх розрахунків</span>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab active" onclick="switchTab('table',this)">Таблиця</button>
+    <button class="tab" onclick="switchTab('chart',this)">Графік</button>
+    <button class="tab" onclick="switchTab('report',this)">Звіт</button>
+  </div>
+
+  <!-- TABLE -->
+  <div id="tab-table" class="tab-content active">
+    <div class="card" style="padding: 0.75rem 1.5rem 0.5rem;">
+      <div class="toolbar">
+        <select id="filter-month" onchange="renderTable()"></select>
+        <button class="secondary" onclick="loadData()" style="font-size:12px;padding:6px 12px;">↻ Оновити</button>
+      </div>
+      <div id="table-loading" class="loading" style="display:none;"><span class="spinner"></span>Завантаження...</div>
+      <table id="main-table" style="display:none;">
+        <thead><tr>
+          <th style="width:110px;">Дата</th>
+          <th style="width:130px;">Показник</th>
+          <th style="width:110px;">Витрата</th>
+          <th style="width:100px;">Сума, ₴</th>
+          <th style="width:90px;">Відхилення</th>
+          <th style="width:36px;"></th>
+        </tr></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+      <div id="table-summary" class="summary-row" style="display:none;">
+        <span>Витрата за місяць: <strong id="sum-kwh"></strong></span>
+        <span>Сума: <strong class="green" id="sum-uah"></strong></span>
+      </div>
+      <div id="table-empty" class="empty" style="display:none;">Немає даних за цей місяць</div>
+    </div>
+  </div>
+
+  <!-- CHART -->
+  <div id="tab-chart" class="tab-content">
+    <div class="card">
+      <div class="toolbar">
+        <select id="chart-month" onchange="renderChart()"></select>
+      </div>
+      <div style="position:relative;width:100%;height:280px;">
+        <canvas id="myChart"></canvas>
+      </div>
+      <div id="chart-legend" style="display:flex;gap:16px;margin-top:10px;font-size:12px;color:var(--muted);flex-wrap:wrap;font-family:var(--mono);"></div>
+    </div>
+  </div>
+
+  <!-- REPORT -->
+  <div id="tab-report" class="tab-content">
+    <div class="card">
+      <div class="toolbar">
+        <select id="report-month" onchange="renderReport()"></select>
+      </div>
+      <div class="report-box" id="report-text">Оберіть місяць для генерації звіту</div>
+      <button class="secondary" onclick="copyReport()" style="margin-top:10px;font-size:12px;">Скопіювати звіт</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbwZFpNi8aaAf5FGAaHyv3nPbLK6Zky_pqE9yJW3lc8AcOEwylQx8Nj2i1DbUlkEP24s/exec';
+const MONTHS_UA = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
+
+let data = [];
+let chartInst = null;
+
+function getTariff() {
+  return parseFloat(localStorage.getItem('energy_tariff') || '4.32');
+}
+function saveTariff() {
+  const v = parseFloat(document.getElementById('tariff-input').value);
+  if (!isNaN(v) && v >= 0) {
+    localStorage.setItem('energy_tariff', String(v));
+    updateMetrics(); renderTable(); renderReport();
+  }
+}
+
+function fmtDate(iso) {
+  const [y,m,d] = iso.split('-');
+  return d + '.' + m + '.' + y;
+}
+
+// Витрата між двома сусідніми записами
+function calcConsumption(rows) {
+  // rows sorted asc by date
+  return rows.map((r, i) => {
+    if (i === 0) return { ...r, consumption: null };
+    return { ...r, consumption: +(r.kwh - rows[i-1].kwh).toFixed(2) };
+  });
+}
+
+// Місячна витрата = останній показник місяця - перший показник місяця
+// Але якщо є запис попереднього дня (з попереднього місяця) — використовуємо його як базу
+function monthConsumption(month) {
+  const sorted = data.slice().sort((a,b) => a.date.localeCompare(b.date));
+  const inMonth = sorted.filter(d => d.date.startsWith(month));
+  if (inMonth.length === 0) return null;
+
+  const last = inMonth[inMonth.length - 1];
+  // Шукаємо останній запис ДО першого запису місяця
+  const firstInMonth = inMonth[0];
+  const before = sorted.filter(d => d.date < firstInMonth.date);
+  const base = before.length > 0 ? before[before.length - 1] : null;
+
+  if (base) {
+    return +(last.kwh - base.kwh).toFixed(2);
+  } else {
+    // Немає запису до місяця — рахуємо від першого до останнього всередині місяця
+    return +(last.kwh - inMonth[0].kwh).toFixed(2);
+  }
+}
+
+function getMonths() {
+  const ms = new Set(data.map(d => d.date.slice(0,7)));
+  const cur = new Date().toISOString().slice(0,7);
+  ms.add(cur);
+  return [...ms].sort().reverse();
+}
+
+function populateSelects() {
+  const months = getMonths();
+  ['filter-month','chart-month','report-month'].forEach(id => {
+    const sel = document.getElementById(id);
+    const prev = sel.value;
+    sel.innerHTML = months.map(m => {
+      const [y,mo] = m.split('-');
+      return '<option value="' + m + '">' + MONTHS_UA[+mo-1] + ' ' + y + '</option>';
+    }).join('');
+    if (prev && months.includes(prev)) sel.value = prev;
+  });
+}
+
+async function loadData() {
+  document.getElementById('table-loading').style.display = 'block';
+  document.getElementById('main-table').style.display = 'none';
+  document.getElementById('table-empty').style.display = 'none';
+  try {
+    const res = await fetch(API + '?t=' + Date.now());
+    data = await res.json();
+    data.sort((a,b) => a.date.localeCompare(b.date));
+  } catch(e) {
+    showErr('Помилка завантаження. Перевірте підключення.');
+    document.getElementById('table-loading').style.display = 'none';
+    return;
+  }
+  document.getElementById('table-loading').style.display = 'none';
+  document.getElementById('main-table').style.display = 'table';
+  populateSelects();
+  updateMetrics();
+  renderTable();
+  if (document.getElementById('tab-chart').classList.contains('active')) renderChart();
+  if (document.getElementById('tab-report').classList.contains('active')) renderReport();
+}
+
+async function addEntry() {
+  const date = document.getElementById('inp-date').value;
+  const kwh = parseFloat(document.getElementById('inp-kwh').value);
+  hideMsg();
+  if (!date) { showErr('Оберіть дату'); return; }
+  if (isNaN(kwh) || kwh < 0) { showErr('Введіть показник лічильника'); return; }
+
+  const btn = document.getElementById('add-btn');
+  btn.disabled = true; btn.textContent = 'Зберігаємо...';
+
+  try {
+    const res = await fetch(API, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'add', date, kwh })
+    });
+    const result = await res.json();
+    if (result.status === 'ok') {
+      data.push({ date, kwh });
+      data.sort((a,b) => a.date.localeCompare(b.date));
+      document.getElementById('inp-kwh').value = '';
+      showOk('Збережено!');
+      populateSelects(); updateMetrics(); renderTable(); renderChart(); renderReport();
+    } else {
+      showErr('Запис на цю дату вже існує');
+    }
+  } catch(e) {
+    showErr('Помилка збереження. Спробуйте ще раз.');
+  }
+  btn.disabled = false; btn.textContent = 'Додати';
+}
+
+async function deleteEntry(date) {
+  if (!confirm('Видалити запис за ' + fmtDate(date) + '?')) return;
+  try {
+    await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'delete', date }) });
+    data = data.filter(d => d.date !== date);
+    populateSelects(); updateMetrics(); renderTable(); renderChart(); renderReport();
+  } catch(e) { showErr('Помилка видалення'); }
+}
+
+function showErr(msg) {
+  const e = document.getElementById('err-msg');
+  e.textContent = msg; e.style.display = 'block';
+  document.getElementById('ok-msg').style.display = 'none';
+}
+function showOk(msg) {
+  const e = document.getElementById('ok-msg');
+  e.textContent = msg; e.style.display = 'block';
+  document.getElementById('err-msg').style.display = 'none';
+  setTimeout(() => { e.style.display = 'none'; }, 3000);
+}
+function hideMsg() {
+  document.getElementById('err-msg').style.display = 'none';
+  document.getElementById('ok-msg').style.display = 'none';
+}
+
+function updateMetrics() {
+  const tariff = getTariff();
+  const today = new Date().toISOString().slice(0,7);
+  const curMonth = today;
+
+  // Вчорашній показник = останній запис
+  const sorted = data.slice().sort((a,b) => a.date.localeCompare(b.date));
+  const last = sorted.length ? sorted[sorted.length-1] : null;
+  document.getElementById('m-yesterday').textContent = last ? last.kwh.toFixed(1) : '—';
+
+  const mc = monthConsumption(curMonth);
+  const inMonth = sorted.filter(d => d.date.startsWith(curMonth));
+  const days = inMonth.length > 1 ? inMonth.length - 1 : inMonth.length;
+  const avg = (mc !== null && mc > 0 && days > 0) ? (mc / days).toFixed(1) : '—';
+
+  document.getElementById('m-month').textContent = mc !== null ? mc.toFixed(1) : '—';
+  document.getElementById('m-month-uah').textContent = mc !== null ? (mc * tariff).toFixed(2) + ' ₴' : 'кВт·год';
+  document.getElementById('m-avg').textContent = avg;
+  document.getElementById('m-uah').textContent = mc !== null ? (mc * tariff).toFixed(2) : '—';
+}
+
+function renderTable() {
+  const month = document.getElementById('filter-month').value;
+  const tariff = getTariff();
+  const sorted = data.slice().sort((a,b) => a.date.localeCompare(b.date));
+
+  // Всі записи місяця + останній запис перед місяцем (для витрати першого дня)
+  const inMonth = sorted.filter(d => d.date.startsWith(month));
+  const before = sorted.filter(d => d.date < (month + '-01'));
+  const base = before.length ? before[before.length-1] : null;
+
+  const tbody = document.getElementById('table-body');
+  const empty = document.getElementById('table-empty');
+  const summary = document.getElementById('table-summary');
+
+  if (!inMonth.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    summary.style.display = 'none';
+    document.getElementById('main-table').style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  document.getElementById('main-table').style.display = 'table';
+
+  // Розраховуємо витрату для кожного запису
+  const withBase = base ? [base, ...inMonth] : inMonth;
+  const withConsumption = withBase.map((r, i) => {
+    if (i === 0) return { ...r, consumption: null };
+    return { ...r, consumption: +(r.kwh - withBase[i-1].kwh).toFixed(2) };
+  }).filter(r => inMonth.find(x => x.date === r.date));
+
+  // Середня витрата для відхилення
+  const consumptions = withConsumption.filter(r => r.consumption !== null).map(r => r.consumption);
+  const avgC = consumptions.length ? consumptions.reduce((a,b)=>a+b,0)/consumptions.length : 0;
+  const totalC = consumptions.reduce((a,b)=>a+b,0);
+
+  tbody.innerHTML = withConsumption.slice().reverse().map(r => {
+    const c = r.consumption;
+    let badge = '';
+    if (c === null) {
+      badge = '<span class="badge" style="background:var(--bg);color:var(--muted);">перший</span>';
+    } else if (avgC === 0 || Math.abs(c - avgC) < avgC * 0.1) {
+      badge = '<span class="badge badge-green">норма</span>';
+    } else if (c > avgC) {
+      badge = '<span class="badge badge-red">+' + Math.round((c-avgC)/avgC*100) + '%</span>';
+    } else {
+      badge = '<span class="badge badge-amber">' + Math.round((c-avgC)/avgC*100) + '%</span>';
+    }
+    const cStr = c !== null ? c.toFixed(2) + ' кВт' : '—';
+    const uah = c !== null ? (c * tariff).toFixed(2) + ' ₴' : '—';
+    return '<tr>' +
+      '<td class="mono">' + fmtDate(r.date) + '</td>' +
+      '<td class="mono"><strong>' + r.kwh.toFixed(2) + '</strong></td>' +
+      '<td class="mono">' + cStr + '</td>' +
+      '<td class="mono">' + uah + '</td>' +
+      '<td>' + badge + '</td>' +
+      '<td><button class="del-btn" onclick="deleteEntry(\'' + r.date + '\')">✕</button></td>' +
+      '</tr>';
+  }).join('');
+
+  summary.style.display = 'flex';
+  document.getElementById('sum-kwh').textContent = totalC.toFixed(2) + ' кВт·год';
+  document.getElementById('sum-uah').textContent = (totalC * tariff).toFixed(2) + ' ₴';
+}
+
+function renderChart() {
+  const month = document.getElementById('chart-month').value;
+  const sorted = data.slice().sort((a,b) => a.date.localeCompare(b.date));
+  const inMonth = sorted.filter(d => d.date.startsWith(month));
+  const before = sorted.filter(d => d.date < (month + '-01'));
+  const base = before.length ? before[before.length-1] : null;
+  const withBase = base ? [base, ...inMonth] : inMonth;
+
+  const rows = withBase.map((r, i) => {
+    if (i === 0) return null;
+    return { date: r.date, c: +(r.kwh - withBase[i-1].kwh).toFixed(2) };
+  }).filter(Boolean);
+
+  const canvas = document.getElementById('myChart');
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+  if (!rows.length) { document.getElementById('chart-legend').innerHTML = ''; return; }
+
+  const avg = rows.reduce((a,b)=>a+b.c,0)/rows.length;
+  chartInst = new Chart(canvas, {
+    data: {
+      labels: rows.map(r => r.date.slice(8)),
+      datasets: [
+        { type:'bar', label:'Витрата кВт·год', data: rows.map(r=>r.c), backgroundColor:'#c8d8f0', borderColor:'#3a6ea8', borderWidth:1, borderRadius:3 },
+        { type:'line', label:'Середнє', data: rows.map(()=>+avg.toFixed(2)), borderColor:'#c04a20', borderWidth:2, pointRadius:0, borderDash:[5,4], fill:false, tension:0 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx => ' ' + ctx.parsed.y.toFixed(2) + ' кВт·год' } } },
+      scales: {
+        x:{ ticks:{ font:{size:11,family:'IBM Plex Mono'}, autoSkip:false, maxRotation:45 }, grid:{display:false} },
+        y:{ ticks:{ font:{size:11,family:'IBM Plex Mono'}, callback:v=>v.toFixed(0) }, grid:{ color:'rgba(0,0,0,0.06)' } }
+      }
+    }
+  });
+  document.getElementById('chart-legend').innerHTML =
+    '<span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:#3a6ea8;"></span>Витрата за день (кВт·год)</span>' +
+    '<span style="display:flex;align-items:center;gap:5px;"><span style="width:20px;height:2px;background:#c04a20;"></span>Середнє за місяць</span>';
+}
+
+function renderReport() {
+  const month = document.getElementById('report-month').value;
+  if (!month) return;
+  const tariff = getTariff();
+  const [y, mo] = month.split('-');
+  const sorted = data.slice().sort((a,b) => a.date.localeCompare(b.date));
+  const inMonth = sorted.filter(d => d.date.startsWith(month));
+  const box = document.getElementById('report-text');
+  if (!inMonth.length) { box.textContent = 'Немає даних за цей місяць'; return; }
+
+  const before = sorted.filter(d => d.date < (month + '-01'));
+  const base = before.length ? before[before.length-1] : null;
+  const withBase = base ? [base, ...inMonth] : inMonth;
+
+  const rows = withBase.map((r, i) => {
+    if (i === 0) return null;
+    return { date: r.date, kwh: r.kwh, c: +(r.kwh - withBase[i-1].kwh).toFixed(2) };
+  }).filter(Boolean);
+
+  const totalC = rows.reduce((a,b)=>a+b.c,0);
+  const avg = rows.length ? totalC/rows.length : 0;
+  const maxR = rows.reduce((a,b)=>a.c>b.c?a:b, rows[0]);
+  const minR = rows.reduce((a,b)=>a.c<b.c?a:b, rows[0]);
+
+  const lines = rows.map(r =>
+    '  ' + fmtDate(r.date) +
+    '   показник: ' + String(r.kwh.toFixed(2)).padStart(9) +
+    '   витрата: ' + String(r.c.toFixed(2)).padStart(7) + ' кВт' +
+    '   ' + String((r.c*tariff).toFixed(2)).padStart(8) + ' ₴'
+  ).join('\n');
+
+  const firstRecord = inMonth[0];
+  const lastRecord = inMonth[inMonth.length-1];
+
+  box.textContent =
+'ЗВІТ ПО ЕЛЕКТРОЕНЕРГІЇ\n' +
+MONTHS_UA[+mo-1] + ' ' + y + '\n' +
+'━'.repeat(56) + '\n\n' +
+'Тариф:                    ' + tariff.toFixed(2) + ' ₴/кВт·год\n' +
+'Показник на початку:      ' + (base ? base.kwh.toFixed(2) : firstRecord.kwh.toFixed(2)) + ' кВт·год (' + fmtDate(base ? base.date : firstRecord.date) + ')\n' +
+'Показник в кінці:         ' + lastRecord.kwh.toFixed(2) + ' кВт·год (' + fmtDate(lastRecord.date) + ')\n\n' +
+'Загальна витрата:         ' + totalC.toFixed(2) + ' кВт·год\n' +
+'Сума до оплати:           ' + (totalC * tariff).toFixed(2) + ' ₴\n' +
+'Кількість днів:           ' + rows.length + '\n' +
+'Середнє на день:          ' + avg.toFixed(2) + ' кВт·год  (' + (avg*tariff).toFixed(2) + ' ₴)\n' +
+'Максимум за день:         ' + maxR.c.toFixed(2) + ' кВт·год — ' + fmtDate(maxR.date) + '\n' +
+'Мінімум за день:          ' + minR.c.toFixed(2) + ' кВт·год — ' + fmtDate(minR.date) + '\n\n' +
+'━'.repeat(56) + '\n' +
+'Деталізація:\n\n' +
+'  Дата         Показник       Витрата        Сума\n' +
+'  ' + '─'.repeat(52) + '\n' +
+lines + '\n\n' +
+'━'.repeat(56) + '\n' +
+'Дата формування: ' + new Date().toLocaleDateString('uk-UA');
+}
+
+function copyReport() {
+  const text = document.getElementById('report-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    btn.textContent = 'Скопійовано!';
+    setTimeout(() => { btn.textContent = 'Скопіювати звіт'; }, 2000);
+  });
+}
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'chart') renderChart();
+  if (name === 'report') renderReport();
+}
+
+// init
+document.getElementById('inp-date').value = new Date().toISOString().slice(0,10);
+document.getElementById('tariff-input').value = getTariff();
+document.getElementById('header-date').textContent =
+  new Date().toLocaleDateString('uk-UA', { day:'numeric', month:'long', year:'numeric' });
+loadData();
+</script>
+</body>
+</html>
