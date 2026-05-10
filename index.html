@@ -27,7 +27,8 @@
 --radius-lg: 10px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+html { overflow-x: hidden; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
 
 header {
 background: var(--text); color: #fff;
@@ -144,7 +145,7 @@ max-height: 440px; overflow-y: auto;
 .metric-value { font-size: 20px; }
 .container { padding: 0.75rem; }
 header { padding: 0 0.75rem; }
-.input-row { flex-direction: column; align-items: stretch; }
+.input-row { flex-direction: column; align-items: stretch; width: 100%; }
 .input-row input[type="date"],
 .input-row input[type="number"],
 .input-row button { width: 100%; box-sizing: border-box; }
