@@ -141,8 +141,22 @@ max-height: 440px; overflow-y: auto;
 
 @media (max-width: 600px) {
 .metrics { grid-template-columns: 1fr 1fr; }
-.container { padding: 1rem; }
-header { padding: 0 1rem; }
+.metric-value { font-size: 20px; }
+.container { padding: 0.75rem; }
+header { padding: 0 0.75rem; }
+.input-row { flex-direction: column; align-items: stretch; }
+.input-row input[type="date"],
+.input-row input[type="number"],
+.input-row button { width: 100%; box-sizing: border-box; }
+input[type="date"], input[type="number"] { width: 100%; }
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { min-width: 520px; }
+.summary-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+.toolbar { flex-wrap: wrap; }
+.tab-bar { flex-wrap: wrap; }
+.report-box { font-size: 11px; padding: 0.75rem; }
+.card { padding: 1rem; }
+.card-title { margin-bottom: 0.75rem; }
 }
 </style>
 </head>
@@ -190,8 +204,7 @@ header { padding: 0 1rem; }
 <div class="ok" id="ok-msg"></div>
 </div>
 
-<div class="card" style="padding: 1rem 1.5rem;">
-<div class="card-title">Тариф</div>
+<div class="hint" style="margin-bottom:1rem;">Тариф для розрахунків: <strong id="tariff-display" style="font-family:var(--mono);color:var(--text);"></strong> ₴/кВт·год</div>
 <div class="tariff-row">
 <label>₴ за кВт·год:</label>
 <input type="number" id="tariff-input" value="4.32" step="0.01" min="0" onchange="saveTariff()" />
@@ -213,6 +226,7 @@ header { padding: 0 1rem; }
 <button class="secondary" onclick="loadData()" style="font-size:12px;padding:6px 12px;">↻ Оновити</button>
 </div>
 <div id="table-loading" class="loading" style="display:none;"><span class="spinner"></span>Завантаження...</div>
+<div class="table-scroll">
 <table id="main-table" style="display:none;">
 <thead><tr>
 <th style="width:110px;">Дата</th>
@@ -224,6 +238,7 @@ header { padding: 0 1rem; }
 </tr></thead>
 <tbody id="table-body"></tbody>
 </table>
+</div>
 <div id="table-summary" class="summary-row" style="display:none;">
 <span>Витрата за місяць: <strong id="sum-kwh"></strong></span>
 <span>Сума: <strong class="green" id="sum-uah"></strong></span>
@@ -265,16 +280,10 @@ const MONTHS_UA = ['Січень','Лютий','Березень','Квітен�
 let data = [];
 let chartInst = null;
 
-function getTariff() {
-return parseFloat(localStorage.getItem('energy_tariff') || '4.32');
-}
-function saveTariff() {
-const v = parseFloat(document.getElementById('tariff-input').value);
-if (!isNaN(v) && v >= 0) {
-localStorage.setItem('energy_tariff', String(v));
-updateMetrics(); renderTable(); renderReport();
-}
-}
+// ============================================================
+// ТАРИФ — змінити значення нижче при зміні тарифу на електроенергію
+const TARIFF = 4.32; // ₴ за кВт·год
+// ============================================================
 
 function fmtDate(iso) {
 const [y,m,d] = iso.split('-');
@@ -426,7 +435,7 @@ document.getElementById('ok-msg').style.display = 'none';
 }
 
 function updateMetrics() {
-const tariff = getTariff();
+const tariff = TARIFF;
 const today = new Date().toISOString().slice(0,7);
 const curMonth = today;
 
@@ -448,7 +457,7 @@ document.getElementById('m-uah').textContent = mc !== null ? (mc * tariff).toFix
 
 function renderTable() {
 const month = document.getElementById('filter-month').value;
-const tariff = getTariff();
+const tariff = TARIFF;
 const sorted = data.slice().sort((a,b) => a.date.localeCompare(b.date));
 
 // Всі записи місяця + останній запис перед місяцем (для витрати першого дня)
@@ -554,7 +563,7 @@ document.getElementById('chart-legend').innerHTML =
 function renderReport() {
 const month = document.getElementById('report-month').value;
 if (!month) return;
-const tariff = getTariff();
+const tariff = TARIFF;
 const [y, mo] = month.split('-');
 const sorted = data.slice().sort((a,b) => a.date.localeCompare(b.date));
 const inMonth = sorted.filter(d => d.date.startsWith(month));
@@ -627,7 +636,7 @@ if (name === 'report') renderReport();
 
 // init
 document.getElementById('inp-date').value = new Date().toISOString().slice(0,10);
-document.getElementById('tariff-input').value = getTariff();
+document.getElementById('tariff-display').textContent = TARIFF.toFixed(2);
 document.getElementById('header-date').textContent =
 new Date().toLocaleDateString('uk-UA', { day:'numeric', month:'long', year:'numeric' });
 loadData();
